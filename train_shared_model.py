@@ -32,7 +32,7 @@ def feature_gen_train_step(X, y_score, y_disc, shared_model, score_loss_fn, disc
 
         logits = shared_model.discriminator(latent_rep, training=True)
         inverted_disc_loss = alpha * disc_loss_fn(y_disc, logits)
-        feat_gen_loss = score_loss + inverted_disc_loss
+        feat_gen_loss = score_loss - inverted_disc_loss
 
     grads = tape.gradient(feat_gen_loss, shared_model.feature_generator.trainable_weights)
     optimizer.apply_gradients(zip(grads, shared_model.feature_generator.trainable_weights))
@@ -163,7 +163,7 @@ def main():
         X_train_tgt_batch, Y_train_tgt_batch = next(train_tgt_batches)
 
         feat_gen_loss = feature_gen_train_step(
-            X_train_src_batch, Y_train_src_batch, tgt_label, shared_model, score_loss_fn, disc_loss_fn, optimizer, alpha)
+            X_train_src_batch, Y_train_src_batch, src_label, shared_model, score_loss_fn, disc_loss_fn, optimizer, alpha)
 
         score_loss = scorer_train_step(X_train_src_batch, Y_train_src_batch, shared_model, score_loss_fn, optimizer)
 
@@ -172,7 +172,7 @@ def main():
 
         disc_loss = discriminator_train_step(X_train_conc, labels_conc, shared_model, disc_loss_fn, optimizer, alpha)
 
-        if step % batch_size == 0:
+        if (steps//batch_size) % step == 0:
             print(
                 "feat_gen_loss (for one batch) at step %d: %.4f"
                 % (step, float(feat_gen_loss))
