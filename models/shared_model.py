@@ -35,5 +35,5 @@ class SharedModel(keras.Model):
 
     def discriminator_model(self):
         discriminator_input = layers.Input(shape=(100,), name='discriminator_input')
-        y_class = layers.Dense(1, name='y_class')(discriminator_input)
+        y_class = layers.Dense(1, activation='sigmoid', name='y_class')(discriminator_input)
         return keras.Model(inputs=discriminator_input, outputs=y_class, name="discriminator_model")

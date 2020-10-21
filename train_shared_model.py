@@ -140,8 +140,8 @@ def main():
     train_tgt_batches = batch_generator(
         [X_train_tgt, Y_train_tgt], batch_size)
 
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-3)
-    disc_loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+    disc_loss_fn = tf.keras.losses.BinaryCrossentropy()
     score_loss_fn = tf.keras.losses.MeanSquaredError()
 
     shared_model = SharedModel(len(word_vocab), max_sentnum, max_sentlen, embedding_dim, embed_table)
