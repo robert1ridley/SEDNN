@@ -172,20 +172,29 @@ def main():
 
         disc_loss = discriminator_train_step(X_train_conc, labels_conc, shared_model, disc_loss_fn, optimizer, alpha)
 
-        if step % (steps//epochs) == 0:
+        current_step = step + 1
+        if current_step % (steps//epochs) == 0:
             print(
-                "feat_gen_loss (for one batch) at epoch %d: %.4f"
-                % (step, float(feat_gen_loss))
+                "feat_gen_loss (for one batch) at step %d: %.4f"
+                % (current_step, float(feat_gen_loss))
             )
             print(
                 "score_loss (for one batch) at step %d: %.4f"
-                % (step, float(score_loss))
+                % (current_step, float(score_loss))
             )
             print(
                 "disc_loss (for one batch) at step %d: %.4f"
-                % (step, float(disc_loss))
+                % (current_step, float(disc_loss))
             )
-            evaluator.evaluate(shared_model, (steps//epochs) / step)
+            print('steps', steps)
+            print('step', current_step)
+            print('epochs', epochs)
+            print('batch_size', batch_size)
+            print('Evaluating epoch', current_step/(steps//epochs))
+            if step == 0:
+                evaluator.evaluate(shared_model, 0)
+            else:
+                evaluator.evaluate(shared_model, current_step/(steps//epochs))
 
     evaluator.print_final_info()
 
