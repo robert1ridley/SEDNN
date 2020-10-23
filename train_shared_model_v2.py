@@ -27,7 +27,8 @@ def batch_generator(data, batch_size):
 def feature_gen_train_step(X, y_score, y_disc, model, disc_loss_fn, score_loss_fn, optimizer, alpha):
     with tf.GradientTape() as tape:
         output = model(X, training=True)
-        loss = get_loss(alpha, disc_loss_fn, score_loss_fn, output[0], y_disc, output[1], y_score)
+        loss = get_loss(alpha, disc_loss_fn, score_loss_fn,
+                        d_logits=output[0], domain=y_disc, s_logits=output[1], s_labels=y_score)
 
     grads = tape.gradient(loss, model.trainable_weights)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -38,7 +39,8 @@ def feature_gen_train_step(X, y_score, y_disc, model, disc_loss_fn, score_loss_f
 def scorer_train_step(X, y_score, model, disc_loss_fn, score_loss_fn, optimizer, alpha):
     with tf.GradientTape() as tape:
         output = model(X, training=True)
-        loss = get_loss(alpha, disc_loss_fn, score_loss_fn, output, y_score)
+        loss = get_loss(alpha, disc_loss_fn, score_loss_fn,
+                        d_logits=None, domain=None, s_logits=output, s_labels=y_score)
 
     grads = tape.gradient(loss, model.trainable_weights)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -49,7 +51,8 @@ def scorer_train_step(X, y_score, model, disc_loss_fn, score_loss_fn, optimizer,
 def discriminator_train_step(X, y_disc, model, disc_loss_fn, score_loss_fn, optimizer, alpha):
     with tf.GradientTape() as tape:
         output = model(X, training=True)
-        loss = get_loss(alpha, disc_loss_fn, score_loss_fn, output, y_disc)
+        loss = get_loss(alpha, disc_loss_fn, score_loss_fn,
+                        d_logits=output, domain=y_disc, s_logits=None, s_labels=None)
 
     grads = tape.gradient(loss, model.trainable_weights)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -59,6 +62,8 @@ def discriminator_train_step(X, y_disc, model, disc_loss_fn, score_loss_fn, opti
 def get_loss(alpha, disc_loss_fn, score_loss_fn, d_logits=None, domain=None, s_logits=None, s_labels=None):
     if s_logits is None:
         return alpha * disc_loss_fn(domain, d_logits)
+    elif d_logits is None:
+        return score_loss_fn(s_labels, s_logits)
     else:
         return score_loss_fn(s_labels, s_logits) + (alpha * disc_loss_fn(domain, d_logits))
 
