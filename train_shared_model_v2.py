@@ -61,11 +61,11 @@ def discriminator_train_step(X, y_disc, model, disc_loss_fn, score_loss_fn, opti
 
 def get_loss(alpha, disc_loss_fn, score_loss_fn, d_logits=None, domain=None, s_logits=None, s_labels=None):
     if s_logits is None:
-        return alpha * disc_loss_fn(domain, d_logits)
+        return disc_loss_fn(domain, d_logits)
     elif d_logits is None:
         return score_loss_fn(s_labels, s_logits)
     else:
-        return score_loss_fn(s_labels, s_logits) + (alpha * disc_loss_fn(domain, d_logits))
+        return score_loss_fn(s_labels, s_logits) + (disc_loss_fn(domain, d_logits))
 
 
 def main():
@@ -156,8 +156,9 @@ def main():
     alpha = 0.1
 
     evaluator = SharedModelEvaluatorV2(test_prompt_id, X_dev_src, X_train_tgt, X_dev_tgt, dev_data_src['prompt_ids'],
-                                     train_data_tgt['prompt_ids'], dev_data_tgt['prompt_ids'], Y_dev_src, Y_train_tgt,
-                                     Y_dev_tgt)
+                                       train_data_tgt['prompt_ids'], dev_data_tgt['prompt_ids'], Y_dev_src, Y_train_tgt,
+                                       Y_dev_tgt)
+
     evaluator.evaluate(shared_model, 0, print_info=True)
 
     for step in range(steps):
