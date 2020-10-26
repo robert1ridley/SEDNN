@@ -49,9 +49,7 @@ class SharedModelV2(keras.Model):
         y_score_out = y_score(avg_hz_lstm)
         self.scorer = keras.Model(inputs=word_input, outputs=y_score_out, name="scorer_model")
 
-        y_class_out = y_class(avg_hz_lstm)
-        self.discriminator = keras.Model(inputs=word_input, outputs=y_class_out, name="discriminator_model")
-
         grad_rev_rep = grad_rev(avg_hz_lstm)
         y_class_reversed_out = y_class(grad_rev_rep)
-        self.feature_generator = keras.Model(inputs=word_input, outputs=[y_class_reversed_out, y_score_out])
+        self.feature_generator = keras.Model(inputs=word_input, outputs=[y_class_reversed_out, y_score_out],
+                                             name="feature_gen_model")
