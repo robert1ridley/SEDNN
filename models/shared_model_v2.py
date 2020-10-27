@@ -27,6 +27,9 @@ class SharedModelV2(keras.Model):
     def __init__(self, vocab_size, maxnum, maxlen, embedding_dim, embedding_weights):
         super(SharedModelV2, self).__init__()
 
+        self.maxnum = maxnum
+        self.maxlen = maxlen
+
         # feature extractor
         self.emb = layers.Embedding(output_dim=embedding_dim, input_dim=vocab_size, input_length=maxnum * maxlen,
                                     weights=embedding_weights, mask_zero=True)

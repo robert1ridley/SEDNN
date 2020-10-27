@@ -145,7 +145,7 @@ def main():
         current_step = step + 1
         current_epoch = current_step // (steps // epochs)
         p = current_epoch / epochs
-        alpha = 2 / (1 + math.exp(-10 * p)) - 1
+        alpha = 2 / (1 + math.exp(-2 * p)) - 1
 
         src_label = tf.zeros((batch_size, 1))
         tgt_label = tf.ones((batch_size, 1))
@@ -165,6 +165,7 @@ def main():
             print('step', current_step)
             print('epochs', epochs)
             print('batch_size', batch_size)
+            print('alpha', alpha)
             print('Evaluating epoch', current_step/(steps//epochs))
             if step == 0:
                 evaluator.evaluate(shared_model, 0)

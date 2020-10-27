@@ -42,14 +42,13 @@ class SharedModelEvaluatorV2():
         self.dev_tgt_rmse = root_mean_square_error(self.Y_dev_tgt_org, dev_tgt_pred)
 
     def evaluate(self, model, epoch, print_info=True):
-        dev_src_pred = model(self.X_dev_src)
-        train_tgt_pred = model(self.X_train_tgt)
-        dev_tgt_pred = model(self.X_dev_tgt)
+        dev_src_pred = model.predict(self.X_dev_src, batch_size=32)
+        train_tgt_pred = model.predict(self.X_train_tgt, batch_size=32)
+        dev_tgt_pred = model.predict(self.X_dev_tgt, batch_size=32)
 
-        dev_src_pred_int = dev_src_pred[1].numpy()
-        dev_src_pred_int = dev_src_pred_int.flatten() * 100
-        train_tgt_pred_int = rescale_tointscore(train_tgt_pred[1].numpy(), self.X_train_tgt_prompt_ids)
-        dev_tgt_pred_int = rescale_tointscore(dev_tgt_pred[1].numpy(), self.X_dev_tgt_prompt_ids)
+        dev_src_pred_int = dev_src_pred[1].flatten() * 100
+        train_tgt_pred_int = rescale_tointscore(train_tgt_pred[1], self.X_train_tgt_prompt_ids)
+        dev_tgt_pred_int = rescale_tointscore(dev_tgt_pred[1], self.X_dev_tgt_prompt_ids)
 
         self.calc_correl(dev_src_pred_int, train_tgt_pred_int, dev_tgt_pred_int)
         self.calc_kappa(dev_src_pred_int, train_tgt_pred_int, dev_tgt_pred_int)
