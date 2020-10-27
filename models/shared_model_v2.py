@@ -28,28 +28,37 @@ class SharedModelV2(keras.Model):
         super(SharedModelV2, self).__init__()
 
         # feature extractor
-        word_input = layers.Input(shape=(maxnum * maxlen,), dtype='int32', name='word_input')
-        x = layers.Embedding(output_dim=embedding_dim, input_dim=vocab_size, input_length=maxnum * maxlen,
-                             weights=embedding_weights, mask_zero=True, name='x')(word_input)
-        x_maskedout = ZeroMaskedEntries(name='x_maskedout')(x)
-        drop_x = layers.Dropout(0.5, name='drop_x')(x_maskedout)
-        resh_W = layers.Reshape((maxnum, maxlen, embedding_dim), name='resh_W')(drop_x)
-        zcnn = layers.TimeDistributed(layers.Conv1D(100, 5, padding='valid'), name='zcnn')(resh_W)
-        avg_zcnn = layers.TimeDistributed(Attention(), name='avg_zcnn')(zcnn)
-        hz_lstm = layers.LSTM(100, return_sequences=True, name='hz_lstm')(avg_zcnn)
-        avg_hz_lstm = Attention(name='avg_hz_lstm')(hz_lstm)
+        self.emb = layers.Embedding(output_dim=embedding_dim, input_dim=vocab_size, input_length=maxnum * maxlen,
+                                    weights=embedding_weights, mask_zero=True)
+        self.x_maskedout = ZeroMaskedEntries()
+        self.drop_x = layers.Dropout(0.5)
+        self.resh_W = layers.Reshape((maxnum, maxlen, embedding_dim))
+        self.zcnn = layers.TimeDistributed(layers.Conv1D(100, 5, padding='valid'))
+        self.avg_zcnn = layers.TimeDistributed(Attention())
+        self.hz_lstm = layers.LSTM(100, return_sequences=True)
+        self.avg_hz_lstm = Attention()
 
         # scorer
-        y_score = layers.Dense(1, activation='sigmoid', name='y_score')
+        self.y_score = layers.Dense(1, activation='sigmoid')
 
         # discriminator
-        grad_rev = GradientReversalLayer()
-        y_class = layers.Dense(1, activation='sigmoid', name='y_class')
+        self.grad_rev = GradientReversalLayer()
+        self.y_class = layers.Dense(1, activation='sigmoid')
 
-        y_score_out = y_score(avg_hz_lstm)
-        self.scorer = keras.Model(inputs=word_input, outputs=y_score_out, name="scorer_model")
+    def call(self, x, lamda=0.1, src=True):
+        x = self.emb(x)
+        x = self.x_maskedout(x)
+        x = self.drop_x(x)
+        x = self.resh_W(x)
+        x = self.zcnn(x)
+        x = self.avg_zcnn(x)
+        x = self.hz_lstm(x)
+        features = self.avg_hz_lstm(x)
+        rev = self.grad_rev(features, lamda)
+        y_class = self.y_class(rev)
 
-        grad_rev_rep = grad_rev(avg_hz_lstm)
-        y_class_reversed_out = y_class(grad_rev_rep)
-        self.feature_generator = keras.Model(inputs=word_input, outputs=[y_class_reversed_out, y_score_out],
-                                             name="feature_gen_model")
+        if src:
+            y_score = self.y_score(features)
+            return y_class, y_score
+        else:
+            return y_class

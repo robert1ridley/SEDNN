@@ -27,10 +27,10 @@ def batch_generator(data, batch_size):
 def feature_gen_train_step(X, y_score, y_disc, shared_model, score_loss_fn, disc_loss_fn, optimizer, alpha):
     with tf.GradientTape() as tape:
         latent_rep = shared_model.feature_generator(X, training=True)
-        score_out = shared_model.scorer(latent_rep, training=True)
+        score_out = shared_model.scorer(latent_rep, training=False)
         score_loss = score_loss_fn(y_score, score_out)
 
-        logits = shared_model.discriminator(latent_rep, training=True)
+        logits = shared_model.discriminator(latent_rep, training=False)
         inverted_disc_loss = alpha * disc_loss_fn(y_disc, logits)
         feat_gen_loss = score_loss - inverted_disc_loss
 
@@ -41,8 +41,8 @@ def feature_gen_train_step(X, y_score, y_disc, shared_model, score_loss_fn, disc
 
 @tf.function
 def scorer_train_step(X, y_score, shared_model, score_loss_fn, optimizer):
+    latent_rep = shared_model.feature_generator(X, training=False)
     with tf.GradientTape() as tape:
-        latent_rep = shared_model.feature_generator(X, training=True)
         score_out = shared_model.scorer(latent_rep, training=True)
         score_loss = score_loss_fn(y_score, score_out)
 
@@ -53,8 +53,8 @@ def scorer_train_step(X, y_score, shared_model, score_loss_fn, optimizer):
 
 @tf.function
 def discriminator_train_step(X, y_disc, shared_model, disc_loss_fn, optimizer, alpha):
+    latent_rep = shared_model.feature_generator(X, training=False)
     with tf.GradientTape() as tape:
-        latent_rep = shared_model.feature_generator(X, training=True)
         logits = shared_model.discriminator(latent_rep, training=True)
         disc_loss = alpha * disc_loss_fn(y_disc, logits)
 

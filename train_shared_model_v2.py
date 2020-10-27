@@ -1,4 +1,5 @@
 import os
+import math
 import argparse
 import random
 import numpy as np
@@ -25,14 +26,14 @@ def batch_generator(data, batch_size):
 
 @tf.function
 def full_train_step(X_src, y_src_label, y_src_score, X_tgt, y_tgt_label,
-                    model, score_loss_fn, disc_loss_fn, optimizer):
+                    model, score_loss_fn, disc_loss_fn, optimizer, alpha):
     with tf.GradientTape() as tape:
-        src_output = model(X_src, training=True)
+        src_output = model(X_src, alpha, src=True, training=True)
         src_disc_loss = get_loss(disc_loss_fn, score_loss_fn,
                                  d_logits=src_output[0], domain=y_src_label, s_logits=None, s_labels=None)
         src_score_loss = get_loss(disc_loss_fn, score_loss_fn,
                                  d_logits=None, domain=None, s_logits=src_output[1], s_labels=y_src_score)
-        tgt_output = model(X_tgt, training=True)
+        tgt_output = model(X_tgt, alpha, src=False, training=True)
         tgt_disc_loss = get_loss(disc_loss_fn, score_loss_fn,
                                  d_logits=tgt_output[0], domain=y_tgt_label, s_logits=None, s_labels=None)
 
@@ -141,6 +142,11 @@ def main():
     evaluator.evaluate(shared_model, 0, print_info=True)
 
     for step in range(steps):
+        current_step = step + 1
+        current_epoch = current_step // (steps // epochs)
+        p = current_epoch / epochs
+        alpha = 2 / (1 + math.exp(-10 * p)) - 1
+
         src_label = tf.zeros((batch_size, 1))
         tgt_label = tf.ones((batch_size, 1))
 
@@ -148,9 +154,8 @@ def main():
         X_train_tgt_batch, Y_train_tgt_batch = next(train_tgt_batches)
 
         loss = full_train_step(X_train_src_batch, src_label, Y_train_src_batch, X_train_tgt_batch, tgt_label,
-                               shared_model.feature_generator, score_loss_fn, disc_loss_fn, optimizer)
+                               shared_model, score_loss_fn, disc_loss_fn, optimizer, alpha)
 
-        current_step = step + 1
         if current_step % (steps//epochs) == 0:
             print(
                     "loss (for one batch) at step %d: %.4f"
