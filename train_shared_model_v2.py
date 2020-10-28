@@ -30,29 +30,33 @@ def full_train_step(X_train_src_batch, Y_train_src_batch, X_both, label_both,
 
     with tf.GradientTape() as tape:
         y_score_pred = shared_model.predict_score(X_train_src_batch, training=True)
+        y_domain_pred = shared_model.predict_domain(X_both, training=True)
         score_loss = get_loss(disc_loss_fn, score_loss_fn, d_logits=None, domain=None, s_logits=y_score_pred,
                               s_labels=Y_train_src_batch)
-    score_grad = tape.gradient(score_loss, shared_model.predict_score.trainable_variables)
+        domain_loss = get_loss(disc_loss_fn, score_loss_fn, d_logits=y_domain_pred, domain=label_both,
+                               s_logits=None, s_labels=None)
+        combined_loss = score_loss + domain_loss
+    combined_grad = tape.gradient(combined_loss, shared_model.feature_extractor.trainable_variables)
 
-    with tf.GradientTape(persistent=True) as tape:
+    with tf.GradientTape() as tape:
+        y_score_pred = shared_model.predict_score(X_train_src_batch, training=True)
+        score_loss = get_loss(disc_loss_fn, score_loss_fn, d_logits=None, domain=None, s_logits=y_score_pred,
+                              s_labels=Y_train_src_batch)
+    score_grad = tape.gradient(score_loss, shared_model.scorer.trainable_variables)
+
+    with tf.GradientTape() as tape:
         y_domain_pred = shared_model.predict_domain(X_both, training=True)
         dc_loss = get_loss(disc_loss_fn, score_loss_fn, d_logits=y_domain_pred, domain=label_both,
                            s_logits=None, s_labels=None)
-        y_score_pred = shared_model.predict_score(X_train_src_batch, training=True)
-        temp_score_loss = get_loss(disc_loss_fn, score_loss_fn, d_logits=None, domain=None, s_logits=y_score_pred,
-                              s_labels=Y_train_src_batch)
-        fe_loss = temp_score_loss + dc_loss
-    fe_grad = tape.gradient(fe_loss, shared_model.feature_extractor.trainable_variables)
-    dc_grad = tape.gradient(dc_loss, shared_model.discriminator.trainable_variables)
-    del tape
+    domain_grad = tape.gradient(dc_loss, shared_model.discriminator.trainable_variables)
 
-    optimizer.apply_gradients(zip(score_grad, shared_model.predict_score.trainable_variables))
+    optimizer.apply_gradients(zip(combined_grad, shared_model.feature_extractor.trainable_variables))
 
-    optimizer.apply_gradients(zip(dc_grad, shared_model.discriminator.trainable_variables))
+    optimizer.apply_gradients(zip(score_grad, shared_model.scorer.trainable_variables))
 
-    optimizer.apply_gradients(zip(fe_grad, shared_model.feature_extractor.trainable_variables))
+    optimizer.apply_gradients(zip(domain_grad, shared_model.discriminator.trainable_variables))
 
-    return fe_loss, score_loss, dc_loss
+    return combined_loss, score_loss, dc_loss
 
 
 def get_loss(disc_loss_fn, score_loss_fn, d_logits=None, domain=None, s_logits=None, s_labels=None):
