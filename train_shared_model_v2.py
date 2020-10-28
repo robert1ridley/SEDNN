@@ -135,6 +135,8 @@ def main():
 
     steps = (X_train_src.shape[0] // batch_size) * epochs
 
+    alpha = 0.1
+
     evaluator = SharedModelEvaluatorV2(test_prompt_id, X_dev_src, X_train_tgt, X_dev_tgt, dev_data_src['prompt_ids'],
                                        train_data_tgt['prompt_ids'], dev_data_tgt['prompt_ids'], Y_dev_src, Y_train_tgt,
                                        Y_dev_tgt)
@@ -142,11 +144,6 @@ def main():
     evaluator.evaluate(shared_model, 0, print_info=True)
 
     for step in range(steps):
-        current_step = step + 1
-        current_epoch = current_step // (steps // epochs)
-        p = current_epoch / epochs
-        alpha = 2 / (1 + math.exp(-2 * p)) - 1
-
         src_label = tf.zeros((batch_size, 1))
         tgt_label = tf.ones((batch_size, 1))
 
@@ -156,6 +153,7 @@ def main():
         loss = full_train_step(X_train_src_batch, src_label, Y_train_src_batch, X_train_tgt_batch, tgt_label,
                                shared_model, score_loss_fn, disc_loss_fn, optimizer, alpha)
 
+        current_step = step + 1
         if current_step % (steps//epochs) == 0:
             print(
                     "loss (for one batch) at step %d: %.4f"

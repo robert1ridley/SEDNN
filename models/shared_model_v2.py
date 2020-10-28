@@ -42,10 +42,12 @@ class SharedModelV2(keras.Model):
         self.avg_hz_lstm = Attention()
 
         # scorer
+        self.y_score_hidden = layers.Dense(100, activation='relu')
         self.y_score = layers.Dense(1, activation='sigmoid')
 
         # discriminator
         self.grad_rev = GradientReversalLayer()
+        self.y_class_hidden = layers.Dense(100, activation='relu')
         self.y_class = layers.Dense(1, activation='sigmoid')
 
     def call(self, x, lamda=0.1, src=True):
@@ -58,10 +60,12 @@ class SharedModelV2(keras.Model):
         x = self.hz_lstm(x)
         features = self.avg_hz_lstm(x)
         rev = self.grad_rev(features, lamda)
-        y_class = self.y_class(rev)
+        y_class_hidden = self.y_class_hidden(rev)
+        y_class = self.y_class(y_class_hidden)
 
         if src:
-            y_score = self.y_score(features)
+            y_score_hidden = self.y_score_hidden(features)
+            y_score = self.y_score(y_score_hidden)
             return y_class, y_score
         else:
             return y_class
