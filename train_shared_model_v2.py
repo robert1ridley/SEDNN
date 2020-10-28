@@ -25,22 +25,34 @@ def batch_generator(data, batch_size):
 
 
 @tf.function
-def full_train_step(X_src, y_src_label, y_src_score, X_tgt, y_tgt_label,
-                    model, score_loss_fn, disc_loss_fn, optimizer, alpha):
-    with tf.GradientTape() as tape:
-        src_output = model(X_src, alpha, src=True, training=True)
-        src_disc_loss = get_loss(disc_loss_fn, score_loss_fn,
-                                 d_logits=src_output[0], domain=y_src_label, s_logits=None, s_labels=None)
-        src_score_loss = get_loss(disc_loss_fn, score_loss_fn,
-                                 d_logits=None, domain=None, s_logits=src_output[1], s_labels=y_src_score)
-        tgt_output = model(X_tgt, alpha, src=False, training=True)
-        tgt_disc_loss = get_loss(disc_loss_fn, score_loss_fn,
-                                 d_logits=tgt_output[0], domain=y_tgt_label, s_logits=None, s_labels=None)
+def full_train_step(X_train_src_batch, Y_train_src_batch, X_both, label_both,
+                    shared_model, score_loss_fn, disc_loss_fn, optimizer):
 
-        total_loss = src_disc_loss + src_score_loss + tgt_disc_loss
-    grads = tape.gradient(total_loss, model.trainable_weights)
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    return total_loss
+    with tf.GradientTape() as tape:
+        y_score_pred = shared_model.predict_score(X_train_src_batch, training=True)
+        score_loss = get_loss(disc_loss_fn, score_loss_fn, d_logits=None, domain=None, s_logits=y_score_pred,
+                              s_labels=Y_train_src_batch)
+    score_grad = tape.gradient(score_loss, shared_model.predict_score.trainable_variables)
+
+    with tf.GradientTape(persistent=True) as tape:
+        y_domain_pred = shared_model.predict_domain(X_both, training=True)
+        dc_loss = get_loss(disc_loss_fn, score_loss_fn, d_logits=y_domain_pred, domain=label_both,
+                           s_logits=None, s_labels=None)
+        y_score_pred = shared_model.predict_score(X_train_src_batch, training=True)
+        temp_score_loss = get_loss(disc_loss_fn, score_loss_fn, d_logits=None, domain=None, s_logits=y_score_pred,
+                              s_labels=Y_train_src_batch)
+        fe_loss = temp_score_loss + dc_loss
+    fe_grad = tape.gradient(fe_loss, shared_model.feature_extractor.trainable_variables)
+    dc_grad = tape.gradient(dc_loss, shared_model.discriminator.trainable_variables)
+    del tape
+
+    optimizer.apply_gradients(zip(score_grad, shared_model.predict_score.trainable_variables))
+
+    optimizer.apply_gradients(zip(dc_grad, shared_model.discriminator.trainable_variables))
+
+    optimizer.apply_gradients(zip(fe_grad, shared_model.feature_extractor.trainable_variables))
+
+    return fe_loss, score_loss, dc_loss
 
 
 def get_loss(disc_loss_fn, score_loss_fn, d_logits=None, domain=None, s_logits=None, s_labels=None):
@@ -127,15 +139,13 @@ def main():
     train_tgt_batches = batch_generator(
         [X_train_tgt, Y_train_tgt], batch_size)
 
-    disc_loss_fn = tf.keras.losses.BinaryCrossentropy()
+    disc_loss_fn = tf.keras.losses.SparseCategoricalCrossentropy()
     score_loss_fn = tf.keras.losses.MeanSquaredError()
     optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
     shared_model = SharedModelV2(len(word_vocab), max_sentnum, max_sentlen, embedding_dim, embed_table)
 
     steps = (X_train_src.shape[0] // batch_size) * epochs
-
-    alpha = 0.1
 
     evaluator = SharedModelEvaluatorV2(test_prompt_id, X_dev_src, X_train_tgt, X_dev_tgt, dev_data_src['prompt_ids'],
                                        train_data_tgt['prompt_ids'], dev_data_tgt['prompt_ids'], Y_dev_src, Y_train_tgt,
@@ -150,20 +160,30 @@ def main():
         X_train_src_batch, Y_train_src_batch = next(train_src_batches)
         X_train_tgt_batch, Y_train_tgt_batch = next(train_tgt_batches)
 
-        loss = full_train_step(X_train_src_batch, src_label, Y_train_src_batch, X_train_tgt_batch, tgt_label,
-                               shared_model, score_loss_fn, disc_loss_fn, optimizer, alpha)
+        X_both = tf.concat([X_train_src_batch, X_train_tgt_batch], axis=0)
+        label_both = tf.concat([src_label, tgt_label], axis=0)
+
+        fe_loss, score_loss, disc_loss = full_train_step(X_train_src_batch, Y_train_src_batch, X_both, label_both,
+                                                shared_model, score_loss_fn, disc_loss_fn, optimizer)
 
         current_step = step + 1
         if current_step % (steps//epochs) == 0:
             print(
-                    "loss (for one batch) at step %d: %.4f"
-                    % (current_step, float(loss))
+                "fe loss (for one batch) at step %d: %.4f"
+                % (current_step, float(fe_loss))
+            )
+            print(
+                "score loss (for one batch) at step %d: %.4f"
+                % (current_step, float(score_loss))
+            )
+            print(
+                "disc loss (for one batch) at step %d: %.4f"
+                % (current_step, float(disc_loss))
             )
             print('steps', steps)
             print('step', current_step)
             print('epochs', epochs)
             print('batch_size', batch_size)
-            print('alpha', alpha)
             print('Evaluating epoch', current_step/(steps//epochs))
             if step == 0:
                 evaluator.evaluate(shared_model, 0)
