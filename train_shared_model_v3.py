@@ -39,6 +39,8 @@ def full_train_step(X_train_src_batch, Y_train_src_batch, src_label, X_both, lab
     for l in shared_model.layers:
         if l.name.startswith('score') or l.name.startswith('domain'):
             l.trainable = False
+        else:
+            l.trainable = True
 
     combined_grad = tape.gradient(combined_loss, shared_model.trainable_variables)
     optimizer.apply_gradients(zip(combined_grad, shared_model.trainable_variables))
