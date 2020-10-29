@@ -27,7 +27,7 @@ def batch_generator(data, batch_size):
 @tf.function
 def full_train_step(X_train_src_batch, Y_train_src_batch, X_both, label_both,
                     shared_model, score_loss_fn, disc_loss_fn, optimizer):
-
+    alpha = 0.1
     with tf.GradientTape() as tape:
         y_score_pred = shared_model.predict_score(X_train_src_batch, training=True)
         y_domain_pred = shared_model.predict_domain(X_both, training=True)
@@ -35,7 +35,7 @@ def full_train_step(X_train_src_batch, Y_train_src_batch, X_both, label_both,
                               s_labels=Y_train_src_batch)
         domain_loss = get_loss(disc_loss_fn, score_loss_fn, d_logits=y_domain_pred, domain=label_both,
                                s_logits=None, s_labels=None)
-        combined_loss = score_loss + domain_loss
+        combined_loss = score_loss + (alpha * domain_loss)
     combined_grad = tape.gradient(combined_loss, shared_model.feature_extractor.trainable_variables)
 
     with tf.GradientTape() as tape:
@@ -48,6 +48,7 @@ def full_train_step(X_train_src_batch, Y_train_src_batch, X_both, label_both,
         y_domain_pred = shared_model.predict_domain(X_both, training=True)
         dc_loss = get_loss(disc_loss_fn, score_loss_fn, d_logits=y_domain_pred, domain=label_both,
                            s_logits=None, s_labels=None)
+        dc_loss = alpha * dc_loss
     domain_grad = tape.gradient(dc_loss, shared_model.discriminator.trainable_variables)
 
     optimizer.apply_gradients(zip(combined_grad, shared_model.feature_extractor.trainable_variables))

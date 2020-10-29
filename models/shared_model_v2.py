@@ -19,7 +19,7 @@ class GradientReversalLayer(layers.Layer):
     def __init__(self):
         super().__init__()
 
-    def call(self, x, lamda=0.1):
+    def call(self, x, lamda=1.0):
         return gradient_reverse(x, lamda)
 
 
